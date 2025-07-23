@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Car, Clock, MapPin, CreditCard, History } from "lucide-react"
+import { Car, Clock, MapPin, CreditCard, History, DollarSign } from "lucide-react"
 import { UserProfile } from "./user-profile"
 import { useState } from "react"
 import {
@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from "docx"
 
 export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
   const userBookings = parkingSlots.filter((slot) => slot.bookedBy === currentUser.name)
@@ -26,6 +27,29 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
   const handleCheckOut = (slotId) => {
     const updatedSlots = parkingSlots.map((slot) => {
       if (slot.id === slotId) {
+        const bookedAt = new Date(slot.bookedAt)
+        const now = new Date()
+        const durationMinutes = Math.floor((now - bookedAt) / (1000 * 60))
+        const durationHours = durationMinutes / 60
+        const ratePerHour = 5 // $5 per hour
+        const amount = Math.max(2.5, Math.round(durationHours * ratePerHour * 100) / 100) // Minimum $2.50 charge
+
+        // Add to billing history with detailed information
+        setBillingHistory((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            date: now.toISOString().split("T")[0],
+            amount,
+            description: `Slot ${slot.number} - ${getTimeElapsed(slot.bookedAt)}`,
+            slotNumber: slot.number,
+            vehicleNumber: slot.vehicleNumber || currentUser.vehicleNumber || "N/A",
+            duration: getTimeElapsed(slot.bookedAt),
+            startTime: bookedAt.toLocaleTimeString(),
+          },
+        ])
+        setTotalSpent((prev) => Math.round((prev + amount) * 100) / 100) // Update total spent
+
         return {
           ...slot,
           status: "available",
@@ -46,6 +70,227 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     return `${Math.floor(elapsed / 60)} hours ${elapsed % 60} minutes`
   }
 
+  // Calculate current bill for active parking session
+  const getCurrentBill = () => {
+    if (!currentBooking) return null
+    const bookedAt = new Date(currentBooking.bookedAt)
+    const now = new Date()
+    const durationMinutes = Math.floor((now - bookedAt) / (1000 * 60))
+    const durationHours = durationMinutes / 60
+    const ratePerHour = 5 // $5 per hour
+    const amount = Math.max(2.5, Math.round(durationHours * ratePerHour * 100) / 100) // Minimum $2.50 charge
+    return {
+      id: currentBooking.id,
+      date: now.toISOString().split("T")[0],
+      amount,
+      description: `Slot ${currentBooking.number} - ${getTimeElapsed(currentBooking.bookedAt)}`,
+      slotNumber: currentBooking.number,
+      vehicleNumber: currentBooking.vehicleNumber || currentUser.vehicleNumber || "N/A",
+      duration: getTimeElapsed(currentBooking.bookedAt),
+      startTime: bookedAt.toLocaleTimeString(),
+    }
+  }
+
+  // Generate Word bill for current or historical bill
+  const generateBillWord = (bill) => {
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Parking Management System",
+                bold: true,
+                size: 32,
+                font: "Arial",
+              }),
+            ],
+            alignment: "center",
+            spacing: { after: 200 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Parking Bill Invoice",
+                bold: true,
+                size: 28,
+                font: "Arial",
+              }),
+            ],
+            alignment: "center",
+            spacing: { after: 200 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Issued to: ${currentUser.name}`,
+                size: 24,
+                font: "Arial",
+              }),
+            ],
+            alignment: "center",
+            spacing: { after: 100 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Date: ${new Date(bill.date).toLocaleDateString()}`,
+                size: 20,
+                font: "Arial",
+              }),
+            ],
+            alignment: "center",
+            spacing: { after: 400 },
+          }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Description", bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Value", bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Customer Name" })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: currentUser.name })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Vehicle Number" })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: bill.vehicleNumber || "N/A" })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Slot Number" })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: bill.slotNumber })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Date" })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: new Date(bill.date).toLocaleDateString() })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Description" })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: bill.description })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Duration" })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: bill.duration })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Start Time" })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: bill.startTime })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Amount" })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: `$ ${bill.amount.toFixed(2)}` })] })],
+                  }),
+                ],
+              }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Total Amount: $ ${bill.amount.toFixed(2)}`,
+                bold: true,
+                size: 24,
+                font: "Arial",
+              }),
+            ],
+            alignment: "center",
+            spacing: { before: 400, after: 400 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Thank you for using our parking services!",
+                size: 20,
+                font: "Arial",
+              }),
+            ],
+            alignment: "center",
+            spacing: { after: 200 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "For any inquiries, please contact support@parking.com",
+                size: 20,
+                font: "Arial",
+              }),
+            ],
+            alignment: "center",
+          }),
+        ],
+      }],
+    })
+
+    // Generate and download the Word document
+    Packer.toBlob(doc).then((blob) => {
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `bill_${bill.id}.docx`
+      link.click()
+      window.URL.revokeObjectURL(url)
+    }).catch((error) => {
+      console.error("Error generating Word document:", error)
+      alert("Failed to generate bill. Please try again.")
+    })
+  }
+
   // State for Payment & Billing
   const [balance, setBalance] = useState(25.50)
   const [totalSpent, setTotalSpent] = useState(48.75)
@@ -53,12 +298,31 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     { id: 1, type: "Visa", last4: "1234", expiry: "12/25", cardType: "Credit" },
   ])
   const [billingHistory, setBillingHistory] = useState([
-    { id: 1, date: "2025-07-23", amount: 15.25, description: "Slot A05 - 2h 15m" },
-    { id: 2, date: "2025-07-20", amount: 33.50, description: "Slot A03 - 1h 45m" },
+    {
+      id: 1,
+      date: "2025-07-23",
+      amount: 15.25,
+      description: "Slot A05 - 2h 15m",
+      slotNumber: "A05",
+      vehicleNumber: "ABC123",
+      duration: "2h 15m",
+      startTime: "2:30 PM",
+    },
+    {
+      id: 2,
+      date: "2025-07-20",
+      amount: 33.50,
+      description: "Slot A03 - 1h 45m",
+      slotNumber: "A03",
+      vehicleNumber: "XYZ789",
+      duration: "1h 45m",
+      startTime: "10:15 AM",
+    },
   ])
   const [addFundsAmount, setAddFundsAmount] = useState("")
   const [newCard, setNewCard] = useState({ cardNumber: "", expiry: "", cvv: "", cardType: "Credit" })
   const [error, setError] = useState("")
+  const [showAllHistory, setShowAllHistory] = useState(false)
 
   // Handle adding funds
   const handleAddFunds = () => {
@@ -98,7 +362,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     const last4 = cardNumber.slice(-4).padStart(4, "0")
     const newMethod = {
       id: Date.now(),
-      type: cardType === "Credit" || cardType === "Debit" ? cardType : "Unknown",
+      type: cardType,
       last4,
       expiry,
       cardType,
@@ -201,6 +465,40 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
                   Check Out
                 </Button>
               </div>
+
+              {/* Active Parking Bill Section */}
+              <div className="pt-4 border-t">
+                <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  Current Parking Bill
+                </h4>
+                {getCurrentBill() && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Slot Number</p>
+                        <p className="text-lg font-bold text-blue-600">{getCurrentBill().slotNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Duration</p>
+                        <p className="text-lg font-bold text-orange-600">{getCurrentBill().duration}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Estimated Amount</p>
+                        <p className="text-lg font-bold text-green-600">${getCurrentBill().amount.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none hover:from-blue-600 hover:to-purple-600"
+                      onClick={() => generateBillWord(getCurrentBill())}
+                    >
+                      Get Bill
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -234,24 +532,19 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                <div>
-                  <p className="font-medium text-sm">Slot A05</p>
-                  <p className="text-xs text-gray-500">Yesterday, 2:30 PM</p>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  2h 15m
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                <div>
-                  <p className="font-medium text-sm">Slot A03</p>
-                  <p className="text-xs text-gray-500">Dec 28, 10:15 AM</p>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  1h 45m
-                </Badge>
-              </div>
+              {billingHistory
+                .slice(0, showAllHistory ? billingHistory.length : 2)
+                .map((bill) => (
+                  <div key={bill.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div>
+                      <p className="font-medium text-sm">{bill.slotNumber}</p>
+                      <p className="text-xs text-gray-500">{new Date(bill.date).toLocaleDateString()}, {bill.startTime}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {bill.duration}
+                    </Badge>
+                  </div>
+                ))}
               <Button variant="outline" size="sm" className="w-full bg-transparent">
                 View All History
               </Button>
@@ -286,7 +579,11 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
           {/* Add Funds Dialog */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none hover:from-blue-600 hover:to-purple-600"
+              >
                 Add Funds
               </Button>
             </DialogTrigger>
@@ -308,7 +605,11 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
                     step="0.01"
                   />
                 </div>
-                <Button onClick={handleAddFunds} disabled={!addFundsAmount}>
+                <Button
+                  onClick={handleAddFunds}
+                  disabled={!addFundsAmount}
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                >
                   Add Funds
                 </Button>
               </div>
@@ -334,7 +635,11 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
             ))}
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none hover:from-blue-600 hover:to-purple-600"
+                >
                   Add Payment Method
                 </Button>
               </DialogTrigger>
@@ -396,7 +701,10 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
                     </div>
                   </div>
                   {error && <p className="text-sm text-red-600">{error}</p>}
-                  <Button type="submit" className="w-full">
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                  >
                     Add Card
                   </Button>
                 </form>
@@ -407,18 +715,39 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
           {/* Billing History */}
           <div className="mt-4">
             <h4 className="font-medium mb-2">Billing History</h4>
-            {billingHistory.map((bill) => (
-              <div key={bill.id} className="flex items-center justify-between p-2 border rounded mb-2">
-                <div>
-                  <p className="font-medium text-sm">{bill.description}</p>
-                  <p className="text-xs text-gray-500">{new Date(bill.date).toLocaleDateString()}</p>
+            {billingHistory
+              .slice(0, showAllHistory ? billingHistory.length : 2)
+              .map((bill) => (
+                <div key={bill.id} className="flex items-center justify-between p-2 border rounded mb-2">
+                  <div>
+                    <p className="font-medium text-sm">{bill.description}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(bill.date).toLocaleDateString()} | Vehicle: {bill.vehicleNumber} | Start: {bill.startTime}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold">${bill.amount.toFixed(2)}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none hover:from-blue-600 hover:to-purple-600"
+                      onClick={() => generateBillWord(bill)}
+                    >
+                      Get Bill
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-sm font-bold">${bill.amount.toFixed(2)}</p>
-              </div>
-            ))}
-            <Button variant="outline" size="sm" className="w-full mt-2">
-              View All History
-            </Button>
+              ))}
+            {billingHistory.length > 2 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2"
+                onClick={() => setShowAllHistory(!showAllHistory)}
+              >
+                {showAllHistory ? "Show Less" : "View All History"}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
