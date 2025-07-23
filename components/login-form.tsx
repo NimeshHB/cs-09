@@ -22,8 +22,8 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
     vehicleNumber: "",
     vehicleType: "",
     role: "user",
-    adminLevel: "manager",
-    permissions: [],
+    adminLevel: "manager", // Default for admins, optional based on role
+    permissions: [], // Optional for admins
   })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
@@ -57,6 +57,7 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
     setLoading(true)
     setErrors({})
 
+    console.log("Login attempt:", loginData)
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -64,6 +65,7 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
         body: JSON.stringify(loginData),
       })
       const data = await response.json()
+      console.log("Login response:", data)
       if (data.success) {
         onLogin(data.user)
       } else {
@@ -82,34 +84,30 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
     setLoading(true)
     setErrors({})
 
-    const newErrors = {}
-    if (!registerData.name) newErrors.name = "Name is required"
-    if (!registerData.email) newErrors.email = "Email is required"
-    if (!registerData.password) newErrors.password = "Password is required"
-    if (registerData.password.length < 6) newErrors.password = "Password must be at least 6 characters"
-    if (registerData.password !== registerData.confirmPassword)
-      newErrors.confirmPassword = "Passwords don't match"
-    if (registerData.role === "user") {
-      if (!registerData.vehicleNumber) newErrors.vehicleNumber = "Vehicle number is required"
-      if (!registerData.vehicleType) newErrors.vehicleType = "Vehicle type is required"
-      if (!registerData.phone) newErrors.phone = "Phone number is required"
+    // Prepare data to send, excluding confirmPassword
+    const registrationData = {
+      name: registerData.name,
+      email: registerData.email,
+      password: registerData.password,
+      phone: registerData.phone || undefined,
+      vehicleNumber: registerData.vehicleNumber || undefined,
+      vehicleType: registerData.vehicleType || undefined,
+      role: registerData.role,
+      adminLevel: registerData.role === "admin" ? registerData.adminLevel : undefined,
+      permissions: registerData.role === "admin" ? registerData.permissions : undefined,
     }
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
-      setLoading(false)
-      return
-    }
-
+    console.log("Register attempt:", registrationData)
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(registerData),
+        body: JSON.stringify(registrationData),
       })
       const data = await response.json()
+      console.log("Register response:", data)
       if (data.success) {
-        onLogin(data.user)
+        onLogin(data.user) // Log in the user immediately after registration
         if (onClose) onClose()
       } else {
         setErrors({ register: data.error || "Registration failed" })
@@ -238,7 +236,17 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
                     <Label htmlFor="register-role">Account Type</Label>
                     <Select
                       value={registerData.role}
-                      onValueChange={(value) => setRegisterData({ ...registerData, role: value })}
+                      onValueChange={(value) => {
+                        setRegisterData({
+                          ...registerData,
+                          role: value,
+                          vehicleNumber: value === "user" ? registerData.vehicleNumber : "",
+                          vehicleType: value === "user" ? registerData.vehicleType : "",
+                          phone: value === "user" ? registerData.phone : "",
+                          adminLevel: value === "admin" ? registerData.adminLevel : "manager",
+                          permissions: value === "admin" ? registerData.permissions : [],
+                        })
+                      }}
                       disabled={loading}
                     >
                       <SelectTrigger>
@@ -257,7 +265,9 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
                         <Label htmlFor="register-admin-level">Admin Level</Label>
                         <Select
                           value={registerData.adminLevel}
-                          onValueChange={(value) => setRegisterData({ ...registerData, adminLevel: value })}
+                          onValueChange={(value) =>
+                            setRegisterData({ ...registerData, adminLevel: value })
+                          }
                           disabled={loading}
                         >
                           <SelectTrigger>

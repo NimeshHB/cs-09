@@ -4,8 +4,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Car, Clock, MapPin, CreditCard, History } from "lucide-react"
-// Import the UserProfile component at the top
 import { UserProfile } from "./user-profile"
+import { useState } from "react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
   const userBookings = parkingSlots.filter((slot) => slot.bookedBy === currentUser.name)
@@ -33,6 +43,42 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     const elapsed = Math.floor((new Date() - new Date(bookedAt)) / (1000 * 60))
     if (elapsed < 60) return `${elapsed} minutes`
     return `${Math.floor(elapsed / 60)} hours ${elapsed % 60} minutes`
+  }
+
+  // State for Payment & Billing
+  const [balance, setBalance] = useState(25.50) // Initial balance
+  const [totalSpent, setTotalSpent] = useState(48.75) // Initial total spent
+  const [paymentMethods, setPaymentMethods] = useState([
+    { id: 1, type: "Visa", last4: "1234", expiry: "12/25" },
+  ])
+  const [billingHistory, setBillingHistory] = useState([
+    { id: 1, date: "2025-07-23", amount: 15.25, description: "Slot A05 - 2h 15m" },
+    { id: 2, date: "2025-07-20", amount: 33.50, description: "Slot A03 - 1h 45m" },
+  ])
+  const [addFundsAmount, setAddFundsAmount] = useState("")
+
+  // Handle adding funds
+  const handleAddFunds = () => {
+    const amount = parseFloat(addFundsAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid amount")
+      return
+    }
+    setBalance((prev) => prev + amount)
+    setAddFundsAmount("")
+    alert(`Added $${amount.toFixed(2)} to your balance. New balance: $${balance.toFixed(2)}`)
+  }
+
+  // Handle adding a payment method (mock)
+  const handleAddPaymentMethod = () => {
+    const newMethod = {
+      id: Date.now(),
+      type: "Mastercard",
+      last4: "5678",
+      expiry: "06/26",
+    }
+    setPaymentMethods((prev) => [...prev, newMethod])
+    alert("Payment method added successfully!")
   }
 
   return (
@@ -199,24 +245,78 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h4 className="font-medium mb-2">Current Balance</h4>
-              <p className="text-2xl font-bold text-green-600">$25.50</p>
+              <p className="text-2xl font-bold text-green-600">${balance.toFixed(2)}</p>
               <p className="text-sm text-gray-500">Available credit</p>
             </div>
             <div>
               <h4 className="font-medium mb-2">This Month</h4>
-              <p className="text-2xl font-bold">$48.75</p>
+              <p className="text-2xl font-bold">${totalSpent.toFixed(2)}</p>
               <p className="text-sm text-gray-500">Total spent</p>
             </div>
           </div>
-          <div className="flex gap-2 mt-4">
-            <Button variant="outline" size="sm">
-              Add Funds
+
+          {/* Add Funds Dialog */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="mt-4">
+                Add Funds
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Funds</DialogTitle>
+                <DialogDescription>Enter the amount to add to your balance</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="addFunds">Amount ($)</Label>
+                  <Input
+                    id="addFunds"
+                    type="number"
+                    placeholder="Enter amount"
+                    value={addFundsAmount}
+                    onChange={(e) => setAddFundsAmount(e.target.value)}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <Button onClick={handleAddFunds} disabled={!addFundsAmount}>
+                  Add Funds
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Payment Methods */}
+          <div className="mt-4">
+            <h4 className="font-medium mb-2">Payment Methods</h4>
+            {paymentMethods.map((method) => (
+              <div key={method.id} className="flex items-center justify-between p-2 border rounded mb-2">
+                <span>{method.type} ending in {method.last4} (Exp: {method.expiry})</span>
+                <Button variant="destructive" size="sm" onClick={() => setPaymentMethods(paymentMethods.filter(m => m.id !== method.id))}>
+                  Remove
+                </Button>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" onClick={handleAddPaymentMethod} className="mt-2">
+              Add Payment Method
             </Button>
-            <Button variant="outline" size="sm">
-              Payment Methods
-            </Button>
-            <Button variant="outline" size="sm">
-              Billing History
+          </div>
+
+          {/* Billing History */}
+          <div className="mt-4">
+            <h4 className="font-medium mb-2">Billing History</h4>
+            {billingHistory.map((bill) => (
+              <div key={bill.id} className="flex items-center justify-between p-2 border rounded mb-2">
+                <div>
+                  <p className="font-medium text-sm">{bill.description}</p>
+                  <p className="text-xs text-gray-500">{new Date(bill.date).toLocaleDateString()}</p>
+                </div>
+                <p className="text-sm font-bold">${bill.amount.toFixed(2)}</p>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" className="w-full mt-2">
+              View All History
             </Button>
           </div>
         </CardContent>
@@ -226,7 +326,6 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
       <UserProfile
         currentUser={currentUser}
         onUserUpdate={(updatedUser) => {
-          // In a real app, this would update the user in the database
           console.log("User updated:", updatedUser)
         }}
       />
