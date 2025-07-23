@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
   const userBookings = parkingSlots.filter((slot) => slot.bookedBy === currentUser.name)
@@ -46,16 +47,18 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
   }
 
   // State for Payment & Billing
-  const [balance, setBalance] = useState(25.50) // Initial balance
-  const [totalSpent, setTotalSpent] = useState(48.75) // Initial total spent
+  const [balance, setBalance] = useState(25.50)
+  const [totalSpent, setTotalSpent] = useState(48.75)
   const [paymentMethods, setPaymentMethods] = useState([
-    { id: 1, type: "Visa", last4: "1234", expiry: "12/25" },
+    { id: 1, type: "Visa", last4: "1234", expiry: "12/25", cardType: "Credit" },
   ])
   const [billingHistory, setBillingHistory] = useState([
     { id: 1, date: "2025-07-23", amount: 15.25, description: "Slot A05 - 2h 15m" },
     { id: 2, date: "2025-07-20", amount: 33.50, description: "Slot A03 - 1h 45m" },
   ])
   const [addFundsAmount, setAddFundsAmount] = useState("")
+  const [newCard, setNewCard] = useState({ cardNumber: "", expiry: "", cvv: "", cardType: "Credit" })
+  const [error, setError] = useState("")
 
   // Handle adding funds
   const handleAddFunds = () => {
@@ -69,15 +72,40 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     alert(`Added $${amount.toFixed(2)} to your balance. New balance: $${balance.toFixed(2)}`)
   }
 
-  // Handle adding a payment method (mock)
-  const handleAddPaymentMethod = () => {
+  // Handle adding a new payment method
+  const handleAddPaymentMethod = (e) => {
+    e.preventDefault()
+    const { cardNumber, expiry, cvv, cardType } = newCard
+
+    // Basic validation
+    if (!cardNumber || !expiry || !cvv || !cardType) {
+      setError("All fields are required")
+      return
+    }
+    if (!/^\d{12,19}$/.test(cardNumber.replace(/\s/g, ""))) {
+      setError("Invalid card number (12-19 digits)")
+      return
+    }
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) {
+      setError("Invalid expiry date (MM/YY)")
+      return
+    }
+    if (!/^\d{3,4}$/.test(cvv)) {
+      setError("Invalid CVV (3-4 digits)")
+      return
+    }
+
+    const last4 = cardNumber.slice(-4).padStart(4, "0")
     const newMethod = {
       id: Date.now(),
-      type: "Mastercard",
-      last4: "5678",
-      expiry: "06/26",
+      type: cardType === "Credit" || cardType === "Debit" ? cardType : "Unknown",
+      last4,
+      expiry,
+      cardType,
     }
     setPaymentMethods((prev) => [...prev, newMethod])
+    setNewCard({ cardNumber: "", expiry: "", cvv: "", cardType: "Credit" })
+    setError("")
     alert("Payment method added successfully!")
   }
 
@@ -292,15 +320,88 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
             <h4 className="font-medium mb-2">Payment Methods</h4>
             {paymentMethods.map((method) => (
               <div key={method.id} className="flex items-center justify-between p-2 border rounded mb-2">
-                <span>{method.type} ending in {method.last4} (Exp: {method.expiry})</span>
-                <Button variant="destructive" size="sm" onClick={() => setPaymentMethods(paymentMethods.filter(m => m.id !== method.id))}>
+                <span>
+                  {method.type} ({method.cardType}) ending in {method.last4} (Exp: {method.expiry})
+                </span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setPaymentMethods(paymentMethods.filter((m) => m.id !== method.id))}
+                >
                   Remove
                 </Button>
               </div>
             ))}
-            <Button variant="outline" size="sm" onClick={handleAddPaymentMethod} className="mt-2">
-              Add Payment Method
-            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="mt-2">
+                  Add Payment Method
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Payment Method</DialogTitle>
+                  <DialogDescription>Enter your card details</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddPaymentMethod} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cardType">Card Type</Label>
+                    <Select
+                      value={newCard.cardType}
+                      onValueChange={(value) => setNewCard({ ...newCard, cardType: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select card type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Credit">Credit</SelectItem>
+                        <SelectItem value="Debit">Debit</SelectItem>
+                        <SelectItem value="Prepaid">Prepaid</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cardNumber">Card Number</Label>
+                    <Input
+                      id="cardNumber"
+                      type="text"
+                      placeholder="1234 5678 9012 3456"
+                      value={newCard.cardNumber}
+                      onChange={(e) => setNewCard({ ...newCard, cardNumber: e.target.value.replace(/\D/g, "") })}
+                      maxLength={19}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="expiry">Expiry Date (MM/YY)</Label>
+                      <Input
+                        id="expiry"
+                        type="text"
+                        placeholder="MM/YY"
+                        value={newCard.expiry}
+                        onChange={(e) => setNewCard({ ...newCard, expiry: e.target.value })}
+                        maxLength={5}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cvv">CVV</Label>
+                      <Input
+                        id="cvv"
+                        type="text"
+                        placeholder="123"
+                        value={newCard.cvv}
+                        onChange={(e) => setNewCard({ ...newCard, cvv: e.target.value.replace(/\D/g, "") })}
+                        maxLength={4}
+                      />
+                    </div>
+                  </div>
+                  {error && <p className="text-sm text-red-600">{error}</p>}
+                  <Button type="submit" className="w-full">
+                    Add Card
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Billing History */}
