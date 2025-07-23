@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Car, Clock, MapPin, CreditCard, History, DollarSign } from "lucide-react"
+import { Car, Clock, MapPin, CreditCard, History, DollarSign, BarChart } from "lucide-react"
 import { UserProfile } from "./user-profile"
 import { useState, useEffect } from "react"
 import {
@@ -19,10 +19,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from "docx"
+import { Bar, Line, Pie } from "react-chartjs-2"
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend } from "chart.js"
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend)
 
 export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
   const [localParkingSlots, setLocalParkingSlots] = useState(parkingSlots)
-  const [refresh, setRefresh] = useState(0) // For triggering re-renders
+  const [refresh, setRefresh] = useState(0)
   const [balance, setBalance] = useState(25.50)
   const [totalSpent, setTotalSpent] = useState(0)
   const [paymentMethods, setPaymentMethods] = useState([
@@ -65,7 +69,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
       console.error("Booking failed: No vehicle number")
       return
     }
-    const now = new Date() // July 24, 2025, 03:43 AM +0530
+    const now = new Date() // July 24, 2025, 04:13 AM +0530
     const updatedSlots = localParkingSlots.map((slot) => {
       if (slot.id === availableSlot.id) {
         return {
@@ -86,7 +90,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
 
   // Checkout function
   const handleCheckOut = (slotId) => {
-    const now = new Date() // July 24, 2025, 03:43 AM +0530
+    const now = new Date() // July 24, 2025, 04:13 AM +0530
     const updatedSlots = localParkingSlots.map((slot) => {
       if (slot.id === slotId) {
         const bookedAt = new Date(slot.bookedAt)
@@ -151,7 +155,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
   const getCurrentBill = () => {
     if (!currentBooking) return null
     const bookedAt = new Date(currentBooking.bookedAt)
-    const now = new Date() // July 24, 2025, 03:43 AM +0530
+    const now = new Date() // July 24, 2025, 04:13 AM +0530
     const durationMinutes = Math.floor((now - bookedAt) / (1000 * 60))
     const durationHours = durationMinutes / 60
     const ratePerHour = 5 // $5 per hour
@@ -422,6 +426,85 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     alert("Payment method added successfully!")
   }
 
+  // Prepare data for monthly analytics charts
+  const getMonthlyAnalytics = () => {
+    const months = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ]
+    const bookingsPerMonth = new Array(12).fill(0)
+    const durationPerMonth = new Array(12).fill(0)
+    const amountPerMonth = new Array(12).fill(0)
+
+    billingHistory.forEach((bill) => {
+      const date = new Date(bill.date)
+      const month = date.getMonth() // 0-11
+      bookingsPerMonth[month] += 1
+      // Convert duration (e.g., "2 hours 15 minutes") to hours
+      const durationMatch = bill.duration.match(/(\d+)\s*hour.*\s*(\d+)\s*minute/)
+      const hours = durationMatch ? parseInt(durationMatch[1]) + parseInt(durationMatch[2]) / 60 : 0
+      durationPerMonth[month] += hours
+      amountPerMonth[month] += bill.amount
+    })
+
+    return {
+      labels: months,
+      bookings: bookingsPerMonth,
+      durations: durationPerMonth,
+      amounts: amountPerMonth,
+    }
+  }
+
+  const analytics = getMonthlyAnalytics()
+
+  // Bar chart for bookings per month
+  const barChartData = {
+    labels: analytics.labels,
+    datasets: [{
+      label: "Number of Bookings",
+      data: analytics.bookings,
+      backgroundColor: "rgba(59, 130, 246, 0.6)", // Blue
+      borderColor: "#3B82F6",
+      borderWidth: 1,
+    }],
+  }
+
+  // Line chart for duration per month
+  const lineChartData = {
+    labels: analytics.labels,
+    datasets: [{
+      label: "Total Duration (Hours)",
+      data: analytics.durations,
+      fill: false,
+      borderColor: "#8B5CF6", // Purple
+      tension: 0.4,
+    }],
+  }
+
+  // Pie chart for amount spent per month
+  const pieChartData = {
+    labels: analytics.labels.filter((_, i) => analytics.amounts[i] > 0),
+    datasets: [{
+      label: "Total Amount Spent ($)",
+      data: analytics.amounts.filter(amount => amount > 0),
+      backgroundColor: [
+        "#3B82F6", "#6B7280", "#8B5CF6", "#10B981", "#EF4444",
+        "#F59E0B", "#3B82F6", "#D1D5DB", "#7C3AED", "#059669",
+        "#DC2626", "#D97706"
+      ],
+      borderColor: "#FFFFFF",
+      borderWidth: 1,
+    }],
+  }
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" },
+      tooltip: { enabled: true },
+    },
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -476,6 +559,60 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
             <p className="text-xs text-muted-foreground">This month</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Analytics Button */}
+      <div className="flex justify-end">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="lg"
+              className="bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none hover:from-blue-600 hover:to-purple-600"
+            >
+              <BarChart className="h-5 w-5 mr-2" />
+              View Monthly Parking Analytics
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-gradient-to-r from-blue-50 to-purple-50">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <BarChart className="h-5 w-5 text-purple-600" />
+                Monthly Parking Analytics
+              </DialogTitle>
+              <DialogDescription>Visualize your parking activity for 2025</DialogDescription>
+            </DialogHeader>
+            {billingHistory.length === 0 ? (
+              <p className="text-sm text-gray-600">No parking data available for analytics.</p>
+            ) : (
+              <div className="space-y-8 p-4">
+                {/* Bar Chart: Bookings per Month */}
+                <div>
+                  <h4 className="font-medium mb-2 text-blue-700">Bookings per Month</h4>
+                  <div className="h-64">
+                    <Bar data={barChartData} options={chartOptions} />
+                  </div>
+                </div>
+
+                {/* Line Chart: Duration per Month */}
+                <div>
+                  <h4 className="font-medium mb-2 text-purple-700">Total Duration per Month (Hours)</h4>
+                  <div className="h-64">
+                    <Line data={lineChartData} options={chartOptions} />
+                  </div>
+                </div>
+
+                {/* Pie Chart: Amount Spent per Month */}
+                <div>
+                  <h4 className="font-medium mb-2 text-green-700">Total Amount Spent per Month ($)</h4>
+                  <div className="h-64">
+                    <Pie data={pieChartData} options={chartOptions} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Current Booking Status */}
