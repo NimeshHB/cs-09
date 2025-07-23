@@ -7,6 +7,15 @@ import { Button } from "@/components/ui/button"
 import { BarChart3, Users, Car, TrendingUp, AlertTriangle } from "lucide-react"
 import { AdminManagement } from "./admin-management"
 import { SlotManagement } from "./slot-management"
+import { useState } from "react"
+import { LoginForm } from "./login-form" // Adjust path as needed
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/dialog" // Ensure this is installed (e.g., @radix-ui/react-dialog)
 
 export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
   const occupiedSlots = parkingSlots.filter((slot) => slot.status === "occupied").length
@@ -19,21 +28,29 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
     .sort((a, b) => new Date(b.bookedAt) - new Date(a.bookedAt))
     .slice(0, 5)
 
-  // Function to export data as CSV
   const handleExportReport = () => {
-    const headers = ["Slot Number,Status,Vehicle Number,Booked By,Booked At"];
-    const rows = parkingSlots.map(slot => 
-      `${slot.number},${slot.status},${slot.vehicleNumber || ''},${slot.bookedBy || ''},${slot.bookedAt ? new Date(slot.bookedAt).toLocaleString() : ''}`
-    );
-    const csvContent = [headers, ...rows].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `parking_report_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-  };
+    const headers = ["Slot Number,Status,Vehicle Number,Booked By,Booked At"]
+    const rows = parkingSlots.map((slot) =>
+      `${slot.number},${slot.status},${slot.vehicleNumber || ""},${slot.bookedBy || ""},${
+        slot.bookedAt ? new Date(slot.bookedAt).toLocaleString() : ""
+      }`
+    )
+    const csvContent = [headers, ...rows].join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `parking_report_${new Date().toISOString().split("T")[0]}.csv`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false)
+
+  const handleUserAdded = (newUser) => {
+    console.log("New user added:", newUser)
+    setIsAddUserOpen(false) // Close modal after successful registration
+  }
 
   return (
     <div className="space-y-6">
@@ -45,7 +62,6 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
         </Button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -57,7 +73,6 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
             <p className="text-xs text-muted-foreground">Parking capacity</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Occupied</CardTitle>
@@ -68,7 +83,6 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
             <p className="text-xs text-muted-foreground">Currently parked</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Available</CardTitle>
@@ -79,7 +93,6 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
             <p className="text-xs text-muted-foreground">Ready for booking</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Occupancy Rate</CardTitle>
@@ -101,6 +114,56 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="users" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>Manage vehicle users and attendants</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">Registered Users</h4>
+                  <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">Add New User</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <CardTitle>Add New User</CardTitle>
+                        <DialogDescription>Create a new user account</DialogDescription>
+                      </DialogHeader>
+                      <LoginForm onLogin={handleUserAdded} initialTab="register" isModal={true} />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Users className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="font-medium"></p>
+                        <p className="text-sm text-gray-500"></p>
+                      </div>
+                    </div>
+                    <Badge>Active</Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Users className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="font-medium"></p>
+                        <p className="text-sm text-gray-500"></p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary">Attendant</Badge>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -135,7 +198,6 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>System Alerts</CardTitle>
@@ -205,46 +267,6 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage vehicle users and attendants</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-medium">Registered Users</h4>
-                  <Button size="sm">Add New User</Button>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Users className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="font-medium"></p>
-                        <p className="text-sm text-gray-500"></p>
-                      </div>
-                    </div>
-                    <Badge>Active</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Users className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="font-medium"></p>
-                        <p className="text-sm text-gray-500"></p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary">Attendant</Badge>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="settings" className="space-y-4">
           <Card>
             <CardHeader>
@@ -256,11 +278,19 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Default Time Limit (hours)</label>
-                    <input type="number" defaultValue="2" className="w-full mt-1 px-3 py-2 border rounded-md" />
+                    <input
+                      type="number"
+                      defaultValue="2"
+                      className="w-full mt-1 px-3 py-2 border rounded-md"
+                    />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Hourly Rate ($)</label>
-                    <input type="number" defaultValue="5" className="w-full mt-1 px-3 py-2 border rounded-md" />
+                    <input
+                      type="number"
+                      defaultValue="5"
+                      className="w-full mt-1 px-3 py-2 border rounded-md"
+                    />
                   </div>
                 </div>
                 <Button>Save Settings</Button>

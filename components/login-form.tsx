@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,8 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Car, Shield, Users, Eye, EyeOff, Loader2 } from "lucide-react"
 
-export function LoginForm({ onLogin }) {
-  const [activeTab, setActiveTab] = useState("login")
+export function LoginForm({ onLogin, initialTab = "login", isModal = false }) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [showPassword, setShowPassword] = useState(false)
   const [loginData, setLoginData] = useState({ email: "", password: "" })
   const [registerData, setRegisterData] = useState({
@@ -27,6 +27,12 @@ export function LoginForm({ onLogin }) {
   })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isModal && initialTab === "register") {
+      setActiveTab("register")
+    }
+  }, [isModal, initialTab])
 
   const vehicleTypes = [
     { value: "car", label: "Car" },
@@ -45,14 +51,10 @@ export function LoginForm({ onLogin }) {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(loginData),
       })
-
       const data = await response.json()
-
       if (data.success) {
         onLogin(data.user)
       } else {
@@ -71,16 +73,12 @@ export function LoginForm({ onLogin }) {
     setLoading(true)
     setErrors({})
 
-    // Client-side validation
     const newErrors = {}
     if (!registerData.name) newErrors.name = "Name is required"
     if (!registerData.email) newErrors.email = "Email is required"
     if (!registerData.password) newErrors.password = "Password is required"
     if (registerData.password.length < 6) newErrors.password = "Password must be at least 6 characters"
-    if (registerData.password !== registerData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords don't match"
-    }
-
+    if (registerData.password !== registerData.confirmPassword) newErrors.confirmPassword = "Passwords don't match"
     if (registerData.role === "user") {
       if (!registerData.vehicleNumber) newErrors.vehicleNumber = "Vehicle number is required"
       if (!registerData.vehicleType) newErrors.vehicleType = "Vehicle type is required"
@@ -96,14 +94,10 @@ export function LoginForm({ onLogin }) {
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(registerData),
       })
-
       const data = await response.json()
-
       if (data.success) {
         onLogin(data.user)
       } else {
@@ -121,7 +115,6 @@ export function LoginForm({ onLogin }) {
     setLoading(true)
     setErrors({})
 
-    // Demo credentials
     const demoCredentials = {
       "admin@parking.com": "admin123",
       "manager@parking.com": "manager123",
@@ -132,17 +125,10 @@ export function LoginForm({ onLogin }) {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password: demoCredentials[email],
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: demoCredentials[email] }),
       })
-
       const data = await response.json()
-
       if (data.success) {
         onLogin(data.user)
       } else {
@@ -157,25 +143,27 @@ export function LoginForm({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Car className="h-10 w-10 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">Smart Parking</h1>
+    <div className={`min-h-screen ${isModal ? "" : "bg-gradient-to-br from-blue-50 to-indigo-100"} flex items-center justify-center p-4`}>
+      <div className={`w-full ${isModal ? "max-w-md" : "max-w-md"}`}>
+        {!isModal && (
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <Car className="h-10 w-10 text-blue-600" />
+              <h1 className="text-3xl font-bold text-gray-900">Smart Parking</h1>
+            </div>
+            <p className="text-gray-600">A Proud Group 09 Collaborative Project! 🚗📋</p>
           </div>
-          <p className="text-gray-600">A Proud Group 09 Collaborative Project! 🚗📋</p>
-        </div>
+        )}
 
         <Card>
           <CardHeader>
-            <CardTitle>Welcome</CardTitle>
-            <CardDescription>Sign in to your account or create a new one</CardDescription>
+            <CardTitle>{isModal ? "Add New User" : "Welcome"}</CardTitle>
+            <CardDescription>{isModal ? "Create a new user account" : "Sign in to your account or create a new one"}</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Sign In</TabsTrigger>
+                {!isModal && <TabsTrigger value="login">Sign In</TabsTrigger>}
                 <TabsTrigger value="register">Register</TabsTrigger>
               </TabsList>
 
@@ -193,7 +181,6 @@ export function LoginForm({ onLogin }) {
                       disabled={loading}
                     />
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Password</Label>
                     <div className="relative">
@@ -218,9 +205,7 @@ export function LoginForm({ onLogin }) {
                       </Button>
                     </div>
                   </div>
-
                   {errors.login && <p className="text-sm text-red-600">{errors.login}</p>}
-
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? (
                       <>
@@ -249,11 +234,10 @@ export function LoginForm({ onLogin }) {
                       <SelectContent>
                         <SelectItem value="user">Vehicle User</SelectItem>
                         <SelectItem value="attendant">Parking Attendant</SelectItem>
-                        {/* <SelectItem value="admin">Admin</SelectItem> */}
+                        <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
                   {registerData.role === "admin" && (
                     <>
                       <div className="space-y-2">
@@ -272,7 +256,6 @@ export function LoginForm({ onLogin }) {
                           </SelectContent>
                         </Select>
                       </div>
-
                       <div className="space-y-2">
                         <Label>Admin Permissions</Label>
                         <div className="grid grid-cols-2 gap-2">
@@ -304,7 +287,6 @@ export function LoginForm({ onLogin }) {
                       </div>
                     </>
                   )}
-
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="register-name">Full Name *</Label>
@@ -318,7 +300,6 @@ export function LoginForm({ onLogin }) {
                       />
                       {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="register-email">Email Address *</Label>
                       <Input
@@ -332,7 +313,6 @@ export function LoginForm({ onLogin }) {
                       />
                       {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
                     </div>
-
                     {registerData.role === "user" && (
                       <>
                         <div className="space-y-2">
@@ -347,7 +327,6 @@ export function LoginForm({ onLogin }) {
                           />
                           {errors.phone && <p className="text-sm text-red-600">{errors.phone}</p>}
                         </div>
-
                         <div className="space-y-2">
                           <Label htmlFor="register-vehicle-number">Vehicle Number *</Label>
                           <Input
@@ -362,7 +341,6 @@ export function LoginForm({ onLogin }) {
                           />
                           {errors.vehicleNumber && <p className="text-sm text-red-600">{errors.vehicleNumber}</p>}
                         </div>
-
                         <div className="space-y-2">
                           <Label htmlFor="register-vehicle-type">Vehicle Type *</Label>
                           <Select
@@ -385,7 +363,6 @@ export function LoginForm({ onLogin }) {
                         </div>
                       </>
                     )}
-
                     <div className="space-y-2">
                       <Label htmlFor="register-password">Password *</Label>
                       <div className="relative">
@@ -411,7 +388,6 @@ export function LoginForm({ onLogin }) {
                       </div>
                       {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="register-confirm-password">Confirm Password *</Label>
                       <Input
@@ -426,9 +402,7 @@ export function LoginForm({ onLogin }) {
                       {errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword}</p>}
                     </div>
                   </div>
-
                   {errors.register && <p className="text-sm text-red-600">{errors.register}</p>}
-
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? (
                       <>
@@ -445,10 +419,12 @@ export function LoginForm({ onLogin }) {
           </CardContent>
         </Card>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p>Introducing the Parking Management System </p>
-          <p className="mt-1">UoR</p>
-        </div>
+        {!isModal && (
+          <div className="mt-6 text-center text-sm text-gray-600">
+            <p>Introducing the Parking Management System</p>
+            <p className="mt-1">UoR</p>
+          </div>
+        )}
       </div>
     </div>
   )
