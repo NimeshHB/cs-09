@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -5,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Car, Clock, MapPin, CreditCard, History, DollarSign } from "lucide-react"
 import { UserProfile } from "./user-profile"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -20,35 +21,107 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from "docx"
 
 export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
-  const userBookings = parkingSlots.filter((slot) => slot.bookedBy === currentUser.name)
-  const availableSlots = parkingSlots.filter((slot) => slot.status === "available").length
+  const [localParkingSlots, setLocalParkingSlots] = useState(parkingSlots)
+  const [refresh, setRefresh] = useState(0) // For triggering re-renders
+  const [balance, setBalance] = useState(25.50)
+  const [totalSpent, setTotalSpent] = useState(0)
+  const [paymentMethods, setPaymentMethods] = useState([
+    { id: 1, type: "Visa", last4: "1234", expiry: "12/25", cardType: "Credit" },
+  ])
+  const [billingHistory, setBillingHistory] = useState([])
+  const [addFundsAmount, setAddFundsAmount] = useState("")
+  const [newCard, setNewCard] = useState({ cardNumber: "", expiry: "", cvv: "", cardType: "Credit" })
+  const [error, setError] = useState("")
+  const [showAllHistory, setShowAllHistory] = useState(false)
+
+  const userBookings = localParkingSlots.filter((slot) => slot.bookedBy === currentUser.name)
+  const availableSlots = localParkingSlots.filter((slot) => slot.status === "available").length
   const currentBooking = userBookings.find((slot) => slot.status === "occupied")
 
+  // Sync local state with prop changes
+  useEffect(() => {
+    setLocalParkingSlots(parkingSlots)
+  }, [parkingSlots])
+
+  // Refresh UI every 30 seconds for real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefresh((prev) => prev + 1)
+      console.log("UI refreshed at:", new Date().toLocaleString("en-GB", { timeZone: "Asia/Kolkata" }))
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Booking function with real-time timestamp
+  const handleBookSlot = () => {
+    const availableSlot = localParkingSlots.find((slot) => slot.status === "available")
+    if (!availableSlot) {
+      alert("No available slots for booking.")
+      console.error("Booking failed: No available slots")
+      return
+    }
+    if (!currentUser.vehicleNumber) {
+      alert("Please add a vehicle number in your profile before booking.")
+      console.error("Booking failed: No vehicle number")
+      return
+    }
+    const now = new Date() // July 24, 2025, 03:43 AM +0530
+    const updatedSlots = localParkingSlots.map((slot) => {
+      if (slot.id === availableSlot.id) {
+        return {
+          ...slot,
+          status: "occupied",
+          bookedBy: currentUser.name,
+          vehicleNumber: currentUser.vehicleNumber,
+          bookedAt: now.toISOString(),
+        }
+      }
+      return slot
+    })
+    setLocalParkingSlots(updatedSlots)
+    onSlotUpdate(updatedSlots)
+    console.log("Booked slot:", availableSlot.id, "at", now.toLocaleString("en-GB", { timeZone: "Asia/Kolkata" }))
+    alert(`Successfully booked slot ${availableSlot.number}`)
+  }
+
+  // Checkout function
   const handleCheckOut = (slotId) => {
-    const updatedSlots = parkingSlots.map((slot) => {
+    const now = new Date() // July 24, 2025, 03:43 AM +0530
+    const updatedSlots = localParkingSlots.map((slot) => {
       if (slot.id === slotId) {
         const bookedAt = new Date(slot.bookedAt)
-        const now = new Date()
         const durationMinutes = Math.floor((now - bookedAt) / (1000 * 60))
         const durationHours = durationMinutes / 60
         const ratePerHour = 5 // $5 per hour
         const amount = Math.max(2.5, Math.round(durationHours * ratePerHour * 100) / 100) // Minimum $2.50 charge
 
-        // Add to billing history with detailed information
-        setBillingHistory((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            date: now.toISOString().split("T")[0],
-            amount,
-            description: `Slot ${slot.number} - ${getTimeElapsed(slot.bookedAt)}`,
-            slotNumber: slot.number,
-            vehicleNumber: slot.vehicleNumber || currentUser.vehicleNumber || "N/A",
-            duration: getTimeElapsed(slot.bookedAt),
-            startTime: bookedAt.toLocaleTimeString(),
-          },
-        ])
-        setTotalSpent((prev) => Math.round((prev + amount) * 100) / 100) // Update total spent
+        // Check balance
+        if (balance < amount) {
+          alert("Insufficient balance. Please add funds.")
+          console.error("Checkout failed: Insufficient balance", { balance, amount })
+          return slot
+        }
+        setBalance((prev) => prev - amount)
+
+        // Add to billing history
+        setBillingHistory((prev) => {
+          const newHistory = [
+            ...prev,
+            {
+              id: Date.now(),
+              date: now.toISOString().split("T")[0], // e.g., "2025-07-24"
+              amount,
+              description: `Slot ${slot.number} - ${getTimeElapsed(slot.bookedAt)}`,
+              slotNumber: slot.number,
+              vehicleNumber: slot.vehicleNumber || currentUser.vehicleNumber || "N/A",
+              duration: getTimeElapsed(slot.bookedAt),
+              startTime: bookedAt.toLocaleTimeString("en-GB", { hour12: true, timeZone: "Asia/Kolkata" }),
+            },
+          ]
+          console.log("New billing history entry:", newHistory[newHistory.length - 1])
+          return newHistory
+        })
+        setTotalSpent((prev) => Math.round((prev + amount) * 100) / 100)
 
         return {
           ...slot,
@@ -60,38 +133,42 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
       }
       return slot
     })
+    setLocalParkingSlots(updatedSlots)
     onSlotUpdate(updatedSlots)
+    console.log("Checked out slot:", slotId, "at", now.toLocaleString("en-GB", { timeZone: "Asia/Kolkata" }))
+    alert("Successfully checked out")
   }
 
+  // Calculate elapsed time
   const getTimeElapsed = (bookedAt) => {
-    if (!bookedAt) return null
+    if (!bookedAt) return "0 minutes"
     const elapsed = Math.floor((new Date() - new Date(bookedAt)) / (1000 * 60))
-    if (elapsed < 60) return `${elapsed} minutes`
-    return `${Math.floor(elapsed / 60)} hours ${elapsed % 60} minutes`
+    if (elapsed < 60) return `${elapsed} minute${elapsed !== 1 ? "s" : ""}`
+    return `${Math.floor(elapsed / 60)} hour${Math.floor(elapsed / 60) !== 1 ? "s" : ""} ${elapsed % 60} minute${elapsed % 60 !== 1 ? "s" : ""}`
   }
 
   // Calculate current bill for active parking session
   const getCurrentBill = () => {
     if (!currentBooking) return null
     const bookedAt = new Date(currentBooking.bookedAt)
-    const now = new Date()
+    const now = new Date() // July 24, 2025, 03:43 AM +0530
     const durationMinutes = Math.floor((now - bookedAt) / (1000 * 60))
     const durationHours = durationMinutes / 60
     const ratePerHour = 5 // $5 per hour
     const amount = Math.max(2.5, Math.round(durationHours * ratePerHour * 100) / 100) // Minimum $2.50 charge
     return {
       id: currentBooking.id,
-      date: now.toISOString().split("T")[0],
+      date: now.toISOString().split("T")[0], // e.g., "2025-07-24"
       amount,
       description: `Slot ${currentBooking.number} - ${getTimeElapsed(currentBooking.bookedAt)}`,
       slotNumber: currentBooking.number,
       vehicleNumber: currentBooking.vehicleNumber || currentUser.vehicleNumber || "N/A",
       duration: getTimeElapsed(currentBooking.bookedAt),
-      startTime: bookedAt.toLocaleTimeString(),
+      startTime: bookedAt.toLocaleTimeString("en-GB", { hour12: true, timeZone: "Asia/Kolkata" }),
     }
   }
 
-  // Generate Word bill for current or historical bill
+  // Generate Word bill
   const generateBillWord = (bill) => {
     const doc = new Document({
       sections: [{
@@ -135,7 +212,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
           new Paragraph({
             children: [
               new TextRun({
-                text: `Date: ${new Date(bill.date).toLocaleDateString()}`,
+                text: `Date: ${new Date(bill.date).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata" })}`,
                 size: 20,
                 font: "Arial",
               }),
@@ -194,7 +271,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
                     children: [new Paragraph({ children: [new TextRun({ text: "Date" })] })],
                   }),
                   new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: new Date(bill.date).toLocaleDateString() })] })],
+                    children: [new Paragraph({ children: [new TextRun({ text: new Date(bill.date).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata" }) })] })],
                   }),
                 ],
               }),
@@ -277,7 +354,6 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
       }],
     })
 
-    // Generate and download the Word document
     Packer.toBlob(doc).then((blob) => {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
@@ -291,49 +367,18 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     })
   }
 
-  // State for Payment & Billing
-  const [balance, setBalance] = useState(25.50)
-  const [totalSpent, setTotalSpent] = useState(48.75)
-  const [paymentMethods, setPaymentMethods] = useState([
-    { id: 1, type: "Visa", last4: "1234", expiry: "12/25", cardType: "Credit" },
-  ])
-  const [billingHistory, setBillingHistory] = useState([
-    {
-      id: 1,
-      date: "2025-07-23",
-      amount: 15.25,
-      description: "Slot A05 - 2h 15m",
-      slotNumber: "A05",
-      vehicleNumber: "ABC123",
-      duration: "2h 15m",
-      startTime: "2:30 PM",
-    },
-    {
-      id: 2,
-      date: "2025-07-20",
-      amount: 33.50,
-      description: "Slot A03 - 1h 45m",
-      slotNumber: "A03",
-      vehicleNumber: "XYZ789",
-      duration: "1h 45m",
-      startTime: "10:15 AM",
-    },
-  ])
-  const [addFundsAmount, setAddFundsAmount] = useState("")
-  const [newCard, setNewCard] = useState({ cardNumber: "", expiry: "", cvv: "", cardType: "Credit" })
-  const [error, setError] = useState("")
-  const [showAllHistory, setShowAllHistory] = useState(false)
-
   // Handle adding funds
   const handleAddFunds = () => {
     const amount = parseFloat(addFundsAmount)
     if (isNaN(amount) || amount <= 0) {
       alert("Please enter a valid amount")
+      console.error("Add funds failed: Invalid amount", addFundsAmount)
       return
     }
     setBalance((prev) => prev + amount)
     setAddFundsAmount("")
-    alert(`Added $${amount.toFixed(2)} to your balance. New balance: $${balance.toFixed(2)}`)
+    console.log("Added funds:", amount, "New balance:", balance + amount)
+    alert(`Added $${amount.toFixed(2)} to your balance. New balance: $${(balance + amount).toFixed(2)}`)
   }
 
   // Handle adding a new payment method
@@ -341,21 +386,24 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     e.preventDefault()
     const { cardNumber, expiry, cvv, cardType } = newCard
 
-    // Basic validation
     if (!cardNumber || !expiry || !cvv || !cardType) {
       setError("All fields are required")
+      console.error("Add payment method failed: Missing fields", newCard)
       return
     }
     if (!/^\d{12,19}$/.test(cardNumber.replace(/\s/g, ""))) {
       setError("Invalid card number (12-19 digits)")
+      console.error("Add payment method failed: Invalid card number", cardNumber)
       return
     }
     if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) {
       setError("Invalid expiry date (MM/YY)")
+      console.error("Add payment method failed: Invalid expiry", expiry)
       return
     }
     if (!/^\d{3,4}$/.test(cvv)) {
       setError("Invalid CVV (3-4 digits)")
+      console.error("Add payment method failed: Invalid CVV", cvv)
       return
     }
 
@@ -370,6 +418,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
     setPaymentMethods((prev) => [...prev, newMethod])
     setNewCard({ cardNumber: "", expiry: "", cvv: "", cardType: "Credit" })
     setError("")
+    console.log("Added payment method:", newMethod)
     alert("Payment method added successfully!")
   }
 
@@ -423,7 +472,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
             <History className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{billingHistory.length}</div>
             <p className="text-xs text-muted-foreground">This month</p>
           </CardContent>
         </Card>
@@ -459,7 +508,7 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Clock className="h-4 w-4" />
-                  Started at {new Date(currentBooking.bookedAt).toLocaleTimeString()}
+                  Started at {new Date(currentBooking.bookedAt).toLocaleTimeString("en-GB", { hour12: true, timeZone: "Asia/Kolkata" })}
                 </div>
                 <Button onClick={() => handleCheckOut(currentBooking.id)} className="bg-red-600 hover:bg-red-700">
                   Check Out
@@ -514,12 +563,16 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
           <CardContent>
             <div className="space-y-4">
               <p className="text-sm text-gray-600">{availableSlots} slots available for immediate booking</p>
-              <Button className="w-full" disabled={currentBooking || availableSlots === 0}>
+              <Button
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                disabled={currentBooking || availableSlots === 0}
+                onClick={handleBookSlot}
+              >
                 {currentBooking
                   ? "Already Parked"
                   : availableSlots === 0
                     ? "No Slots Available"
-                    : "Find Available Slot"}
+                    : "Book a Slot"}
               </Button>
             </div>
           </CardContent>
@@ -532,22 +585,35 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {billingHistory
-                .slice(0, showAllHistory ? billingHistory.length : 2)
-                .map((bill) => (
-                  <div key={bill.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <div>
-                      <p className="font-medium text-sm">{bill.slotNumber}</p>
-                      <p className="text-xs text-gray-500">{new Date(bill.date).toLocaleDateString()}, {bill.startTime}</p>
+              {billingHistory.length === 0 ? (
+                <p className="text-sm text-gray-600">No booking history available.</p>
+              ) : (
+                billingHistory
+                  .slice(0, showAllHistory ? billingHistory.length : 2)
+                  .map((bill) => (
+                    <div key={bill.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <div>
+                        <p className="font-medium text-sm">{bill.slotNumber}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(bill.date).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata" })}, {bill.startTime}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {bill.duration}
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {bill.duration}
-                    </Badge>
-                  </div>
-                ))}
-              <Button variant="outline" size="sm" className="w-full bg-transparent">
-                View All History
-              </Button>
+                  ))
+              )}
+              {billingHistory.length > 2 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full bg-transparent"
+                  onClick={() => setShowAllHistory(!showAllHistory)}
+                >
+                  {showAllHistory ? "Show Less" : "View All History"}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -715,29 +781,33 @@ export function UserDashboard({ parkingSlots, currentUser, onSlotUpdate }) {
           {/* Billing History */}
           <div className="mt-4">
             <h4 className="font-medium mb-2">Billing History</h4>
-            {billingHistory
-              .slice(0, showAllHistory ? billingHistory.length : 2)
-              .map((bill) => (
-                <div key={bill.id} className="flex items-center justify-between p-2 border rounded mb-2">
-                  <div>
-                    <p className="font-medium text-sm">{bill.description}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(bill.date).toLocaleDateString()} | Vehicle: {bill.vehicleNumber} | Start: {bill.startTime}
-                    </p>
+            {billingHistory.length === 0 ? (
+              <p className="text-sm text-gray-600">No booking history available.</p>
+            ) : (
+              billingHistory
+                .slice(0, showAllHistory ? billingHistory.length : 2)
+                .map((bill) => (
+                  <div key={bill.id} className="flex items-center justify-between p-2 border rounded mb-2">
+                    <div>
+                      <p className="font-medium text-sm">{bill.description}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(bill.date).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata" })} | Vehicle: {bill.vehicleNumber} | Start: {bill.startTime}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold">${bill.amount.toFixed(2)}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none hover:from-blue-600 hover:to-purple-600"
+                        onClick={() => generateBillWord(bill)}
+                      >
+                        Get Bill
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold">${bill.amount.toFixed(2)}</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 text-white border-none hover:from-blue-600 hover:to-purple-600"
-                      onClick={() => generateBillWord(bill)}
-                    >
-                      Get Bill
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))
+            )}
             {billingHistory.length > 2 && (
               <Button
                 variant="outline"
