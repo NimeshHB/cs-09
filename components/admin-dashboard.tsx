@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { BarChart3, Users, Car, TrendingUp, AlertTriangle } from "lucide-react"
 import { AdminManagement } from "./admin-management"
 import { SlotManagement } from "./slot-management"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { LoginForm } from "./login-form" // Adjust path as needed
 import {
   Dialog,
@@ -45,11 +45,21 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
     window.URL.revokeObjectURL(url)
   }
 
+  // State to manage the list of users
+  const [users, setUsers] = useState([
+    { id: 1, name: "John Doe", email: "john@example.com", role: "user", status: "Active", vehicleNumber: "ABC123" },
+    { id: 2, name: "Jane Smith", email: "jane@parking.com", role: "attendant", status: "Active" },
+    { id: 3, name: "Admin User", email: "admin@parking.com", role: "admin", status: "Active", adminLevel: "manager" },
+  ])
   const [isAddUserOpen, setIsAddUserOpen] = useState(false)
 
+  // Handle new user addition
   const handleUserAdded = (newUser) => {
-    console.log("New user added:", newUser)
-    setIsAddUserOpen(false) // Close modal after successful registration
+    setUsers((prevUsers) => [
+      ...prevUsers,
+      { ...newUser, id: Date.now(), status: "Active" }, // Assign a unique ID and default status
+    ])
+    setIsAddUserOpen(false) // Close modal
   }
 
   return (
@@ -144,26 +154,25 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
                   </Dialog>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Users className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="font-medium"></p>
-                        <p className="text-sm text-gray-500"></p>
+                  {users.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Users className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="font-medium">{user.name}</p>
+                          <p className="text-sm text-gray-500">{user.email}</p>
+                        </div>
                       </div>
+                      <Badge variant={user.role === "admin" ? "secondary" : "default"}>
+                        {user.role === "user" && user.vehicleNumber
+                          ? `${user.role} (${user.vehicleNumber})`
+                          : user.role}
+                      </Badge>
                     </div>
-                    <Badge>Active</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Users className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="font-medium"></p>
-                        <p className="text-sm text-gray-500"></p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary">Attendant</Badge>
-                  </div>
+                  ))}
                 </div>
               </div>
             </CardContent>

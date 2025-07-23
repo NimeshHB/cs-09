@@ -28,7 +28,6 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
 
-  // Disable body scroll when modal is open
   useEffect(() => {
     if (isModal) {
       document.body.style.overflow = "hidden"
@@ -111,7 +110,7 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
       const data = await response.json()
       if (data.success) {
         onLogin(data.user)
-        if (onClose) onClose() // Close modal on successful registration
+        if (onClose) onClose()
       } else {
         setErrors({ register: data.error || "Registration failed" })
       }
