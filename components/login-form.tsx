@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Car, Shield, Users, Eye, EyeOff, Loader2 } from "lucide-react"
 
-export function LoginForm({ onLogin, initialTab = "login", isModal = false }) {
+export function LoginForm({ onLogin, initialTab = "login", isModal = false, onClose }) {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [showPassword, setShowPassword] = useState(false)
   const [loginData, setLoginData] = useState({ email: "", password: "" })
@@ -27,6 +27,16 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false }) {
   })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+
+  // Disable body scroll when modal is open
+  useEffect(() => {
+    if (isModal) {
+      document.body.style.overflow = "hidden"
+      return () => {
+        document.body.style.overflow = "auto"
+      }
+    }
+  }, [isModal])
 
   useEffect(() => {
     if (isModal && initialTab === "register") {
@@ -78,7 +88,8 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false }) {
     if (!registerData.email) newErrors.email = "Email is required"
     if (!registerData.password) newErrors.password = "Password is required"
     if (registerData.password.length < 6) newErrors.password = "Password must be at least 6 characters"
-    if (registerData.password !== registerData.confirmPassword) newErrors.confirmPassword = "Passwords don't match"
+    if (registerData.password !== registerData.confirmPassword)
+      newErrors.confirmPassword = "Passwords don't match"
     if (registerData.role === "user") {
       if (!registerData.vehicleNumber) newErrors.vehicleNumber = "Vehicle number is required"
       if (!registerData.vehicleType) newErrors.vehicleType = "Vehicle type is required"
@@ -100,6 +111,7 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false }) {
       const data = await response.json()
       if (data.success) {
         onLogin(data.user)
+        if (onClose) onClose() // Close modal on successful registration
       } else {
         setErrors({ register: data.error || "Registration failed" })
       }
@@ -143,7 +155,9 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false }) {
   }
 
   return (
-    <div className={`min-h-screen ${isModal ? "" : "bg-gradient-to-br from-blue-50 to-indigo-100"} flex items-center justify-center p-4`}>
+    <div
+      className={`min-h-screen ${isModal ? "max-h-[80vh] overflow-y-auto" : "bg-gradient-to-br from-blue-50 to-indigo-100"} flex items-center justify-center p-4`}
+    >
       <div className={`w-full ${isModal ? "max-w-md" : "max-w-md"}`}>
         {!isModal && (
           <div className="text-center mb-8">

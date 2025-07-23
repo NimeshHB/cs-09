@@ -15,7 +15,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog" // Ensure this is installed (e.g., @radix-ui/react-dialog)
+} from "@/components/ui/dialog" // Ensure @radix-ui/react-dialog is installed
 
 export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
   const occupiedSlots = parkingSlots.filter((slot) => slot.status === "occupied").length
@@ -129,12 +129,17 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
                     <DialogTrigger asChild>
                       <Button size="sm">Add New User</Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-h-[80vh] overflow-y-auto">
                       <DialogHeader>
                         <CardTitle>Add New User</CardTitle>
                         <DialogDescription>Create a new user account</DialogDescription>
                       </DialogHeader>
-                      <LoginForm onLogin={handleUserAdded} initialTab="register" isModal={true} />
+                      <LoginForm
+                        onLogin={handleUserAdded}
+                        initialTab="register"
+                        isModal={true}
+                        onClose={() => setIsAddUserOpen(false)}
+                      />
                     </DialogContent>
                   </Dialog>
                 </div>
