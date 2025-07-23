@@ -249,7 +249,7 @@ export function LoginForm({ onLogin }) {
                       <SelectContent>
                         <SelectItem value="user">Vehicle User</SelectItem>
                         <SelectItem value="attendant">Parking Attendant</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
+                        {/* <SelectItem value="admin">Admin</SelectItem> */}
                       </SelectContent>
                     </Select>
                   </div>
