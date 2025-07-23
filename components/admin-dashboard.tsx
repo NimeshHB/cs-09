@@ -19,11 +19,27 @@ export function AdminDashboard({ parkingSlots, onSlotsUpdate }) {
     .sort((a, b) => new Date(b.bookedAt) - new Date(a.bookedAt))
     .slice(0, 5)
 
+  // Function to export data as CSV
+  const handleExportReport = () => {
+    const headers = ["Slot Number,Status,Vehicle Number,Booked By,Booked At"];
+    const rows = parkingSlots.map(slot => 
+      `${slot.number},${slot.status},${slot.vehicleNumber || ''},${slot.bookedBy || ''},${slot.bookedAt ? new Date(slot.bookedAt).toLocaleString() : ''}`
+    );
+    const csvContent = [headers, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `parking_report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
-        <Button variant="outline">
+        <Button variant="outline" onClick={handleExportReport}>
           <BarChart3 className="h-4 w-4 mr-2" />
           Export Report
         </Button>
