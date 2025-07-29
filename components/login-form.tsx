@@ -1,454 +1,208 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Car, Shield, Users, Eye, EyeOff, Loader2 } from "lucide-react"
+import { Car, QrCode, CheckCircle, AlertTriangle, Clock, Search } from "lucide-react"
+import { useState } from "react"
 
-export function LoginForm({ onLogin, initialTab = "login", isModal = false, onClose }) {
-  const [activeTab, setActiveTab] = useState(initialTab)
-  const [showPassword, setShowPassword] = useState(false)
-  const [loginData, setLoginData] = useState({ email: "", password: "" })
-  const [registerData, setRegisterData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    phone: "",
-    vehicleNumber: "",
-    vehicleType: "",
-    role: "user",
-    adminLevel: "manager", // Default for admins, optional based on role
-    permissions: [], // Optional for admins
-  })
-  const [errors, setErrors] = useState({})
-  const [loading, setLoading] = useState(false)
+export function AttendantDashboard({ parkingSlots, onSlotUpdate }) {
+  const [qrCode, setQrCode] = useState("")
+  const [vehicleSearch, setVehicleSearch] = useState("")
 
-  useEffect(() => {
-    if (isModal) {
-      document.body.style.overflow = "hidden"
-      return () => {
-        document.body.style.overflow = "auto"
+  const occupiedSlots = parkingSlots.filter((slot) => slot.status === "occupied")
+  const recentActivity = occupiedSlots.slice(0, 5)
+
+  const handleCheckOut = (slotId) => {
+    const updatedSlots = parkingSlots.map((slot) => {
+      if (slot.id === slotId) {
+        return {
+          ...slot,
+          status: "available",
+          bookedBy: null,
+          vehicleNumber: null,
+          bookedAt: null,
+        }
       }
-    }
-  }, [isModal])
-
-  useEffect(() => {
-    if (isModal && initialTab === "register") {
-      setActiveTab("register")
-    }
-  }, [isModal, initialTab])
-
-  const vehicleTypes = [
-    { value: "car", label: "Car" },
-    { value: "suv", label: "SUV" },
-    { value: "motorcycle", label: "Motorcycle" },
-    { value: "truck", label: "Truck" },
-    { value: "van", label: "Van" },
-    { value: "electric", label: "Electric Vehicle" },
-  ]
-
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setErrors({})
-
-    console.log("Login attempt:", loginData)
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(loginData),
-      })
-      const data = await response.json()
-      console.log("Login response:", data)
-      if (data.success) {
-        onLogin(data.user)
-      } else {
-        setErrors({ login: data.error || "Login failed" })
-      }
-    } catch (error) {
-      console.error("Login error:", error)
-      setErrors({ login: "Network error. Please try again." })
-    } finally {
-      setLoading(false)
-    }
+      return slot
+    })
+    onSlotUpdate(updatedSlots)
   }
 
-  const handleRegister = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setErrors({})
-
-    // Prepare data to send, excluding confirmPassword
-    const registrationData = {
-      name: registerData.name,
-      email: registerData.email,
-      password: registerData.password,
-      phone: registerData.phone || undefined,
-      vehicleNumber: registerData.vehicleNumber || undefined,
-      vehicleType: registerData.vehicleType || undefined,
-      role: registerData.role,
-      adminLevel: registerData.role === "admin" ? registerData.adminLevel : undefined,
-      permissions: registerData.role === "admin" ? registerData.permissions : undefined,
-    }
-
-    console.log("Register attempt:", registrationData)
-    try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(registrationData),
-      })
-      const data = await response.json()
-      console.log("Register response:", data)
-      if (data.success) {
-        onLogin(data.user) // Log in the user immediately after registration
-        if (onClose) onClose()
-      } else {
-        setErrors({ register: data.error || "Registration failed" })
+  const handleManualCheckIn = (slotId) => {
+    const updatedSlots = parkingSlots.map((slot) => {
+      if (slot.id === slotId) {
+        return {
+          ...slot,
+          status: "occupied",
+          bookedBy: "Walk-in Customer",
+          vehicleNumber: `WLK${Math.floor(Math.random() * 1000)}`,
+          bookedAt: new Date(),
+        }
       }
-    } catch (error) {
-      console.error("Registration error:", error)
-      setErrors({ register: "Network error. Please try again." })
-    } finally {
-      setLoading(false)
-    }
+      return slot
+    })
+    onSlotUpdate(updatedSlots)
   }
 
-  const handleQuickLogin = async (email) => {
-    setLoading(true)
-    setErrors({})
+  const getTimeElapsed = (bookedAt) => {
+    if (!bookedAt) return null
+    const elapsed = Math.floor((new Date() - new Date(bookedAt)) / (1000 * 60))
+    if (elapsed < 60) return `${elapsed}m`
+    return `${Math.floor(elapsed / 60)}h ${elapsed % 60}m`
+  }
 
-    const demoCredentials = {
-      "admin@parking.com": "admin123",
-      "manager@parking.com": "manager123",
-      "attendant@parking.com": "attendant123",
-      "john@example.com": "password123",
-    }
-
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: demoCredentials[email] }),
-      })
-      const data = await response.json()
-      if (data.success) {
-        onLogin(data.user)
-      } else {
-        setErrors({ login: data.error || "Quick login failed" })
-      }
-    } catch (error) {
-      console.error("Quick login error:", error)
-      setErrors({ login: "Network error. Please try again." })
-    } finally {
-      setLoading(false)
-    }
+  const getOverstayStatus = (bookedAt, timeLimit = 2) => {
+    if (!bookedAt) return false
+    const elapsed = (new Date() - new Date(bookedAt)) / (1000 * 60 * 60) // hours
+    return elapsed > timeLimit
   }
 
   return (
-    <div
-      className={`min-h-screen ${isModal ? "max-h-[80vh] overflow-y-auto" : "bg-gradient-to-br from-blue-50 to-indigo-100"} flex items-center justify-center p-4`}
-    >
-      <div className={`w-full ${isModal ? "max-w-md" : "max-w-md"}`}>
-        {!isModal && (
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Car className="h-10 w-10 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">Smart Parking</h1>
-            </div>
-            <p className="text-gray-600">A Proud Group 09 Collaborative Project! 🚗📋</p>
-          </div>
-        )}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Attendant Dashboard</h2>
+        <Badge variant="outline" className="text-sm">
+          On Duty
+        </Badge>
+      </div>
 
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>{isModal ? "Add New User" : "Welcome"}</CardTitle>
-            <CardDescription>{isModal ? "Create a new user account" : "Sign in to your account or create a new one"}</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Occupied Slots</CardTitle>
+            <Car className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                {!isModal && <TabsTrigger value="login">Sign In</TabsTrigger>}
-                <TabsTrigger value="register">Register</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="login" className="space-y-4">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={loginData.email}
-                      onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                      className={errors.login ? "border-red-500" : ""}
-                      disabled={loading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter your password"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                        className={errors.login ? "border-red-500" : ""}
-                        disabled={loading}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                        disabled={loading}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  {errors.login && <p className="text-sm text-red-600">{errors.login}</p>}
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing In...
-                      </>
-                    ) : (
-                      "Sign In"
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="register" className="space-y-4">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="register-role">Account Type</Label>
-                    <Select
-                      value={registerData.role}
-                      onValueChange={(value) => {
-                        setRegisterData({
-                          ...registerData,
-                          role: value,
-                          vehicleNumber: value === "user" ? registerData.vehicleNumber : "",
-                          vehicleType: value === "user" ? registerData.vehicleType : "",
-                          phone: value === "user" ? registerData.phone : "",
-                          adminLevel: value === "admin" ? registerData.adminLevel : "manager",
-                          permissions: value === "admin" ? registerData.permissions : [],
-                        })
-                      }}
-                      disabled={loading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select account type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="user">Vehicle User</SelectItem>
-                        <SelectItem value="attendant">Parking Attendant</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {registerData.role === "admin" && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="register-admin-level">Admin Level</Label>
-                        <Select
-                          value={registerData.adminLevel}
-                          onValueChange={(value) =>
-                            setRegisterData({ ...registerData, adminLevel: value })
-                          }
-                          disabled={loading}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select admin level" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="manager">Manager</SelectItem>
-                            <SelectItem value="super">Super Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Admin Permissions</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {["slots", "users", "reports", "settings"].map((permission) => (
-                            <label key={permission} className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                checked={registerData.permissions.includes(permission)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setRegisterData({
-                                      ...registerData,
-                                      permissions: [...registerData.permissions, permission],
-                                    })
-                                  } else {
-                                    setRegisterData({
-                                      ...registerData,
-                                      permissions: registerData.permissions.filter((p) => p !== permission),
-                                    })
-                                  }
-                                }}
-                                className="rounded"
-                                disabled={loading}
-                              />
-                              <span className="text-sm capitalize">{permission}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="register-name">Full Name *</Label>
-                      <Input
-                        id="register-name"
-                        placeholder="Enter your full name"
-                        value={registerData.name}
-                        onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                        className={errors.name ? "border-red-500" : ""}
-                        disabled={loading}
-                      />
-                      {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-email">Email Address *</Label>
-                      <Input
-                        id="register-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={registerData.email}
-                        onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                        className={errors.email ? "border-red-500" : ""}
-                        disabled={loading}
-                      />
-                      {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
-                    </div>
-                    {registerData.role === "user" && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="register-phone">Phone Number *</Label>
-                          <Input
-                            id="register-phone"
-                            placeholder="Enter your phone number"
-                            value={registerData.phone}
-                            onChange={(e) => setRegisterData({ ...registerData, phone: e.target.value })}
-                            className={errors.phone ? "border-red-500" : ""}
-                            disabled={loading}
-                          />
-                          {errors.phone && <p className="text-sm text-red-600">{errors.phone}</p>}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="register-vehicle-number">Vehicle Number *</Label>
-                          <Input
-                            id="register-vehicle-number"
-                            placeholder="e.g., ABC123 or AB12CD3456"
-                            value={registerData.vehicleNumber}
-                            onChange={(e) =>
-                              setRegisterData({ ...registerData, vehicleNumber: e.target.value.toUpperCase() })
-                            }
-                            className={errors.vehicleNumber ? "border-red-500" : ""}
-                            disabled={loading}
-                          />
-                          {errors.vehicleNumber && <p className="text-sm text-red-600">{errors.vehicleNumber}</p>}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="register-vehicle-type">Vehicle Type *</Label>
-                          <Select
-                            value={registerData.vehicleType}
-                            onValueChange={(value) => setRegisterData({ ...registerData, vehicleType: value })}
-                            disabled={loading}
-                          >
-                            <SelectTrigger className={errors.vehicleType ? "border-red-500" : ""}>
-                              <SelectValue placeholder="Select your vehicle type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {vehicleTypes.map((type) => (
-                                <SelectItem key={type.value} value={type.value}>
-                                  {type.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {errors.vehicleType && <p className="text-sm text-red-600">{errors.vehicleType}</p>}
-                        </div>
-                      </>
-                    )}
-                    <div className="space-y-2">
-                      <Label htmlFor="register-password">Password *</Label>
-                      <div className="relative">
-                        <Input
-                          id="register-password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Create a password (min 6 characters)"
-                          value={registerData.password}
-                          onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                          className={errors.password ? "border-red-500" : ""}
-                          disabled={loading}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                          disabled={loading}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-confirm-password">Confirm Password *</Label>
-                      <Input
-                        id="register-confirm-password"
-                        type="password"
-                        placeholder="Confirm your password"
-                        value={registerData.confirmPassword}
-                        onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                        className={errors.confirmPassword ? "border-red-500" : ""}
-                        disabled={loading}
-                      />
-                      {errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword}</p>}
-                    </div>
-                  </div>
-                  {errors.register && <p className="text-sm text-red-600">{errors.register}</p>}
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating Account...
-                      </>
-                    ) : (
-                      "Create Account"
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+            <div className="text-2xl font-bold text-red-600">{occupiedSlots.length}</div>
+            <p className="text-xs text-muted-foreground">Currently parked</p>
           </CardContent>
         </Card>
 
-        {!isModal && (
-          <div className="mt-6 text-center text-sm text-gray-600">
-            <p>Introducing the Parking Management System</p>
-            <p className="mt-1">UoR</p>
-          </div>
-        )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Overstays</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              {occupiedSlots.filter((slot) => getOverstayStatus(slot.bookedAt)).length}
+            </div>
+            <p className="text-xs text-muted-foreground">Need attention</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Check-outs Today</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">8</div>
+            <p className="text-xs text-muted-foreground">Completed</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Duration</CardTitle>
+            <Clock className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">1.5h</div>
+            <p className="text-xs text-muted-foreground">Today's average</p>
+          </CardContent>
+        </Card>
       </div>
+
+      
+
+      {/* Active Bookings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Bookings</CardTitle>
+          <CardDescription>Currently occupied slots requiring attention</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {occupiedSlots.map((slot) => (
+              <div
+                key={slot.id}
+                className={`flex items-center justify-between p-4 border rounded-lg ${
+                  getOverstayStatus(slot.bookedAt) ? "border-orange-300 bg-orange-50" : "border-gray-200"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                    <Car className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Slot {slot.number}</p>
+                    <p className="text-sm text-gray-600">{slot.vehicleNumber}</p>
+                    <p className="text-xs text-gray-500">{slot.bookedBy}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-sm font-medium">{getTimeElapsed(slot.bookedAt)}</p>
+                    <p className="text-xs text-gray-500">Since {new Date(slot.bookedAt).toLocaleTimeString()}</p>
+                  </div>
+
+                  {getOverstayStatus(slot.bookedAt) && (
+                    <Badge variant="destructive" className="text-xs">
+                      Overstay
+                    </Badge>
+                  )}
+
+                  <Button size="sm" variant="outline" onClick={() => handleCheckOut(slot.id)}>
+                    Check Out
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {occupiedSlots.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <Car className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>No active bookings at the moment</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Manual Operations */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Manual Operations</CardTitle>
+          <CardDescription>Handle walk-in customers and special cases</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              variant="outline"
+              className="h-20 flex flex-col items-center justify-center bg-transparent"
+              onClick={() => {
+                const availableSlot = parkingSlots.find((slot) => slot.status === "available")
+                if (availableSlot) {
+                  handleManualCheckIn(availableSlot.id)
+                }
+              }}
+            >
+              <Car className="h-6 w-6 mb-2" />
+              Manual Check-in
+            </Button>
+
+            <Button variant="outline" className="h-20 flex flex-col items-center justify-center bg-transparent">
+              <AlertTriangle className="h-6 w-6 mb-2" />
+              Report Issue
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
