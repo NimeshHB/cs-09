@@ -107,7 +107,7 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
       const data = await response.json()
       console.log("Register response:", data)
       if (data.success) {
-        onLogin(data.user) // Log in the user immediately after registration
+        onLogin(data.user) // Log in the user immediately after registration 
         if (onClose) onClose()
       } else {
         setErrors({ register: data.error || "Registration failed" })
@@ -255,7 +255,7 @@ export function LoginForm({ onLogin, initialTab = "login", isModal = false, onCl
                       <SelectContent>
                         <SelectItem value="user">Vehicle User</SelectItem>
                         <SelectItem value="attendant">Parking Attendant</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
+                        {/* <SelectItem value="admin">Admin</SelectItem> */}
                       </SelectContent>
                     </Select>
                   </div>
